@@ -14,12 +14,14 @@ config.read('config.properties')
 #detach_dir = '.'
 attachment_directory=config.get('general','attachment_directory')
 if 'attachments' not in os.listdir(attachment_directory):
-    os.mkdir(attachment_directory +'r'+'\attachments')
+    os.mkdir(attachment_directory + r'\attachments')
 
 #userName = raw_input('Enter your GMail username:')
 #passwd = getpass.getpass('Enter your password: ')
 userName=config.get('general','gmail_username')
 passwd=config.get('general','gmail_password')
+emails_to_ignore=config.get('general','emails_to_ignore')
+emails_to_ignore_list = emails_to_ignore.split(',')
 
 try:
     imapSession = imaplib.IMAP4_SSL('imap.gmail.com')
@@ -58,9 +60,13 @@ try:
             if part.get('Content-Disposition') is None:
                 # print part.as_string()
                 continue
+            if sender in emails_to_ignore:
+                print('ignoring email from ',sender)
+                continue
+            subject_line = mail['subject'].replace(':','')
             parsedDate = email.utils.parsedate_tz(mail['Date'])
             formattedDate = time.strftime("%Y-%m-%d %Hhrs%Mmin%Ssec", parsedDate[0:9])
-            fileName = 'MESSAGE[' + mail['subject'] +']' + 'FROM[' + sender + ']' + 'SENT_DATE[' + formattedDate +']' + part.get_filename()
+            fileName = 'MESSAGE[' + subject_line +']' + 'FROM[' + sender + ']' + 'SENT_DATE[' + formattedDate +']' + part.get_filename()
             #fileName = '@.MESSAGE[' + mail['subject'] + ']' + part.get_filename()
             if bool(fileName):
                 filePath = os.path.join(attachment_directory, 'attachments', fileName)
