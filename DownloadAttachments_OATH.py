@@ -141,23 +141,15 @@ def SaveAttachments(service, user_id, msg_id, store_dir):
                     subject = header['value'].replace(':','').replace('/','').replace('"','')
                     break
             for part in message['payload']['parts']:
-                    prefix = subject
-                    if 'data' in part['body']:
-                        data=part['body']['data']
-                    elif 'attachmentId' in part['body'] :
+                    if 'attachmentId' in part['body']:
                         att_id=part['body']['attachmentId']
                         att=service.users().messages().attachments().get(userId=user_id, messageId=msg_id,id=att_id).execute()
                         data=att['data']
-                    else:
-                        continue
-                    file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
-                    if message['payload']['filename']:
-                        docname = message['payload']['filename']
-                    else:
-                        docname = subject+'(NO FILE ATTACHED)'
-                    path = os.path.join(store_dir, docname)
-                    with open(path, 'w') as f:
-                        f.write(file_data)
+                        file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+                        path = os.path.join(store_dir, part['filename'])
+                        with open(path, 'w') as f:
+                            f.write(file_data)
+
 
     except errors.HttpError, error:
         print('An error occurred: ', error)
