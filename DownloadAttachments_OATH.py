@@ -3,11 +3,11 @@ import httplib2
 import os
 import base64
 import ConfigParser
+import oauth2client
 
+from zipfile import ZipFile
 from apiclient import discovery
 from apiclient import errors
-
-import oauth2client
 from oauth2client import client
 from oauth2client import tools
 
@@ -147,9 +147,13 @@ def SaveAttachments(service, user_id, msg_id, store_dir):
                         data=att['data']
                         file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
                         path = os.path.join(store_dir, part['filename'])
-                        with open(path, 'w') as f:
-                            f.write(file_data)
-
+                        if not os.path.isfile(path):
+                            with open(path, 'w') as f:
+                                f.write(file_data)
+                            # if path.endswith(".zip"):
+                            #     zippedFile = ZipFile(path)
+                            #     zippedFile.extractall(store_dir)
+                            #     os.remove(path)
 
     except errors.HttpError, error:
         print('An error occurred: ', error)
