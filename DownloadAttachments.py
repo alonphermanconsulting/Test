@@ -14,7 +14,7 @@ config.read('config.properties')
 #detach_dir = '.'
 attachment_directory=config.get('general','attachment_directory')
 if 'attachments' not in os.listdir(attachment_directory):
-    os.mkdir(attachment_directory + r'\attachments')
+    os.mkdir(attachment_directory + r'/attachments')
 
 #userName = raw_input('Enter your GMail username:')
 #passwd = getpass.getpass('Enter your password: ')
