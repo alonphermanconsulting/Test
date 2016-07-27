@@ -8,6 +8,9 @@ import getpass, imaplib
 import os,re
 import sys
 import ConfigParser
+import traceback
+
+from rsa._version200 import from64
 
 config = ConfigParser.RawConfigParser()
 config.read('config.properties')
@@ -49,9 +52,12 @@ try:
         #print 'Raw Date:', mail['Date']
         #print 'From:', mail['From']
         fromEmail = mail['From']
-        start = fromEmail.index('<')+1
-        end = fromEmail.index('>')
-        sender = fromEmail[start:end]
+        if ('<' in fromEmail):
+            start = fromEmail.index('<')+1
+            end = fromEmail.index('>')
+            sender = fromEmail[start:end]
+        else:
+            sender = fromEmail
 
         for part in mail.walk():
             if part.get_content_maintype() == 'multipart':
@@ -66,6 +72,14 @@ try:
             subject_line = mail['subject'].replace(':','')
             parsedDate = email.utils.parsedate_tz(mail['Date'])
             formattedDate = time.strftime("%Y-%m-%d %Hhrs%Mmin%Ssec", parsedDate[0:9])
+            print 'subject_line:', subject_line
+            print 'sender:', sender
+            print 'formattedDate:', formattedDate
+            print 'part.get_filename:', part.get_filename()
+
+            if  part.get_filename() is None:
+                continue
+
             fileName = 'MESSAGE[' + subject_line +']' + 'FROM[' + sender + ']' + 'SENT_DATE[' + formattedDate +']' + part.get_filename()
             #fileName = '@.MESSAGE[' + mail['subject'] + ']' + part.get_filename()
             if bool(fileName):
@@ -78,4 +92,7 @@ try:
     imapSession.close()
     imapSession.logout()
 except:
-    print ('Not able to download all attachments.', sys.exc_info())
+   # print ('Not able to download all attachments.', sys.exc_info())
+    for frame in traceback.extract_tb(sys.exc_info()[2]):
+        fname,lineno,fn,text = frame
+        print "Error in %s on line %d" % (fname, lineno)
