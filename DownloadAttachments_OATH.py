@@ -1,9 +1,10 @@
 from __future__ import print_function
-import httplib2
 import os
 import base64
 import ConfigParser
 import oauth2client
+import httplib2
+import pprint
 
 from zipfile import ZipFile
 from apiclient import discovery
@@ -30,27 +31,27 @@ def main():
     config = ConfigParser.RawConfigParser()
     config.read('config.properties')
     attachment_directory = config.get('general', 'attachment_directory')
-#    if 'attachments' not in os.listdir(attachment_directory):
-#        os.mkdir(attachment_directory + r'attachments')
+    if 'attachments' not in os.listdir(attachment_directory):
+        os.mkdir(attachment_directory + r'\attachments')
 
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('gmail', 'v1', http=http)
 
-    threads = service.users().threads().list(userId='me').execute().get('threads', [])
-    for thread in threads:
-        tdata = service.users().threads().get(userId='me', id=thread['id']).execute()
-        nmsgs = len(tdata['messages'])
-
-        if nmsgs > 0:
-            msg = tdata['messages'][0]['payload']
-            subject = ''
-            for header in msg['headers']:
-                if header['name'] == 'Subject':
-                    subject = header['value']
-                    break
-            if subject:
-                print('%s (%d msgs)' % (subject, nmsgs))
+    # threads = service.users().threads().list(userId='me').execute().get('threads', [])
+    # for thread in threads:
+    #     tdata = service.users().threads().get(userId='me', id=thread['id']).execute()
+    #     nmsgs = len(tdata['messages'])
+    #     for message in tdata['messages']:
+    #         msg = message['payload']
+    #         subject = ''
+    #         print('payload ', msg['filename'])
+    #         for header in msg['headers']:
+    #             if header['name'] == 'Subject':
+    #                 subject = header['value']
+    #                 break
+    #         if subject:
+    #             print('%s (%d msgs)' % (subject, nmsgs))
 
     messages = ListMessagesWithLabel(service, 'me', 'INBOX')
     if not messages:
@@ -58,8 +59,10 @@ def main():
     else:
         for message in messages:
             message_details = service.users().messages().get(userId='me', id=message['id']).execute()
-           # print('added message ', message_details)
-            SaveAttachments(service=service, user_id='me', store_dir=attachment_directory , msg_id=message['id'])
+            print('added message ', message_details)
+            pp = pprint.PrettyPrinter(indent=4)
+            pp.pprint(message_details)
+            SaveAttachments(service=service, user_id='me', store_dir=attachment_directory + r'\attachments', msg_id=message['id'])
 
 
 def get_credentials():
@@ -77,7 +80,7 @@ def get_credentials():
                                   'Google Drive/G/IT/Development/ETL/.credentials')  # JLD - customized path to working directory
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
-    credential_path = os.path.join(credential_dir, 'gmail-python-quickstart.json')
+    credential_path = os.path.join(credential_dir, 'client_secret_anchorpath.json')
 
     store = oauth2client.file.Storage(credential_path)
     credentials = store.get()
@@ -140,7 +143,14 @@ def SaveAttachments(service, user_id, msg_id, store_dir):
                 if header['name'] == 'Subject':
                     subject = header['value'].replace(':','').replace('/','').replace('"','')
                     break
-            for part in message['payload']['parts']:
+            if 'parts' in message['payload']:
+                for part in message['payload']['parts']:
+                    if part['filename']:
+                        file_data = base64.urlsafe_b64decode(part['body']['data'].encode('UTF-8'))
+                        path = ''.join([store_dir, part['filename']])
+                        f = open(path, 'w')
+                        f.write(file_data)
+                        f.close()
                     if 'attachmentId' in part['body']:
                         att_id=part['body']['attachmentId']
                         att=service.users().messages().attachments().get(userId=user_id, messageId=msg_id,id=att_id).execute()
