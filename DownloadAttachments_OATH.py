@@ -5,7 +5,7 @@ import ConfigParser
 import oauth2client
 import httplib2
 import pprint
-
+#
 from zipfile import ZipFile
 from apiclient import discovery
 from apiclient import errors
@@ -31,8 +31,8 @@ def main():
     config = ConfigParser.RawConfigParser()
     config.read('config.properties')
     attachment_directory = config.get('general', 'attachment_directory')
-    if 'attachments' not in os.listdir(attachment_directory):
-        os.mkdir(attachment_directory + r'\attachments')
+    # if 'attachments' not in os.listdir(attachment_directory):
+    #     os.mkdir(attachment_directory + r'\attachments')
 
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
@@ -62,7 +62,7 @@ def main():
             print('added message ', message_details)
             pp = pprint.PrettyPrinter(indent=4)
             pp.pprint(message_details)
-            SaveAttachments(service=service, user_id='me', store_dir=attachment_directory + r'\attachments', msg_id=message['id'])
+            SaveAttachments(service=service, user_id='me', store_dir=attachment_directory, msg_id=message['id'])
 
 
 def get_credentials():
