@@ -60,53 +60,101 @@ def main():
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('gmail', 'v1', http=http)
 
-    # messages = ListMessagesWithLabel(service, 'me', 'INBOX')
-    # if not messages:
-    #     print('No messages found.')
-    # else:
-    #     for message in messages:
-    #         message_details = service.users().messages().get(userId='me', id=message['id']).execute()
+    messages = ListMessagesWithLabel(service, 'me', 'INBOX')
+    if not messages:
+        print('No messages found.')
+    else:
+        for message in messages:
+            message_details = service.users().messages().get(userId='me', id=message['id']).execute()
+            print('found message ', message_details)
+            pp = pprint.PrettyPrinter(indent=4)
+           # pp.pprint(message_details)
+            with open(EMAIL_MESSAGE_DUMP_FILE, 'wt') as out:
+                res = json.dump(message_details, out, sort_keys=True, indent=4, separators=(',', ': '))
+                # find messageid
+            # emailLines = open(EMAIL_MESSAGE_DUMP_FILE, "r")
+            # messageId = ''
+            # for line in emailLines:
+            #     if re.match("(.*)id'(.*)", line):
+            #         strippedLine = line.replace(' ', '').replace('\'id\':', '').replace(':uu', '').replace('\'', ''). \
+            #             replace(',', '').replace('\n', '').replace('uu', '')
+            #         messageId = strippedLine
+            emailLines = open(EMAIL_MESSAGE_DUMP_FILE, "r")
+            fileName = ''
+            attachmentId = ''
+            for line in emailLines:
+                if re.match("(.*)attachmentId(.*)", line):
+                    strippedLine = line.replace(' ', '').replace('\'', '').replace('"', '').\
+                        replace('attachmentId:', '').replace('{', ''). \
+                        replace(',', '').replace('\n', '').replace('\'', '').replace('ubody', '').replace(':uu', '')
+                    attachmentId = strippedLine
+                if re.match("(.*)filename(.*)", line) and not re.match("(.*)value(.*)", line) and not re.match("(.*)[\'\"][\'\"](.*)",line):
+                    strippedLine = line.replace(' ', '').replace('\'', '').replace('"', '').\
+                        replace('filename:', '').replace(',', '').replace('\n', '').replace('\'', '').replace('uu', '')
+                    fileName = strippedLine
+                if fileName and attachmentId:
+                    try:
+                        att = service.users().messages().attachments().get(userId='me', messageId=message['id'],id=attachmentId).execute()
+                    except errors.HttpError, error:
+                        print('An error occurred: ', error)
+                        fileName = ''
+                        attachmentId = ''
+                        continue
+                    data = att['data']
+                    file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+                    path = os.path.join(attachment_directory, fileName)
+                    if not os.path.isfile(path) and not path.endswith(".jpg") and not path.endswith(".png") \
+                            and not path.endswith(".gif") and not path.endswith(".ics"):
+                        with open(path, 'w') as f:
+                            f.write(file_data)
+                            # if path.endswith(".zip"):
+                            #     zippedFile = ZipFile(path)
+                            #     zippedFile.extractall(store_dir)
+                            #     os.remove(path)
+                    continue
 
-    #with open(EMAIL_MESSAGE_DUMP_FILE, 'wt') as out:
-     #   res = json.dump(message_details, out, sort_keys=True, indent=4, separators=(',', ': '))
+                    #  test = findJsonValue(message_details, 'attachmentId')
+                    #  pp = pprint.PrettyPrinter(indent=4)
+                    #  pp.pprint(message_details)
+                    #  SaveAttachments(service=service, user_id='me', store_dir=attachment_directory, msg_id=message['id'])
 
-        # TOCHANGE
+
+                    # TOCHANGE
         # emailLines = open(EMAIL_MESSAGE_DUMP_FILE, "r")
 
     # find messageid
-    emailLines = open("scratchpad.txt", "r")
-    for line in emailLines:
-        if re.match("(.*)id'(.*)", line):
-            strippedLine = line.replace(' ', '').replace('\'id\':', '').replace(':uu', '').replace('\'', ''). \
-                replace(',', '').replace('\n', '').replace('uu', '')
-            messageId = strippedLine
+    # emailLines = open("scratchpad.txt", "r")
+    # for line in emailLines:
+    #     if re.match("(.*)id'(.*)", line):
+    #         strippedLine = line.replace(' ', '').replace('\'id\':', '').replace(':uu', '').replace('\'', ''). \
+    #             replace(',', '').replace('\n', '').replace('uu', '')
+    #         messageId = strippedLine
 
-    emailLines = open("scratchpad.txt", "r")
-
-    fileName = ''
-    attachmentId = ''
-    for line in emailLines:
-        if re.match("(.*)attachmentId(.*)", line):
-            strippedLine = line.replace(' ', '').replace('\'attachmentId\':', '').replace('{', ''). \
-                replace(',', '').replace('\n', '').replace('\'', '').replace('ubody', '').replace(':uu', '')
-            attachmentId = strippedLine
-        if re.match("(.*)filename(.*)", line) and not re.match("(.*)value(.*)", line) and not re.match("(.*)''(.*)",line):
-            strippedLine = line.replace(' ', '').replace('\'filename\':', ''). \
-                replace(',', '').replace('\n', '').replace('\'', '').replace('uu', '')
-            fileName = strippedLine
-        if fileName and attachmentId:
-            att = service.users().messages().attachments().get(userId='me', messageId=messageId,id=attachmentId).execute()
-            data = att['data']
-            file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
-            path = os.path.join(attachment_directory, fileName)
-            if not os.path.isfile(path):
-                with open(path, 'w') as f:
-                    f.write(file_data)
-                    # if path.endswith(".zip"):
-                    #     zippedFile = ZipFile(path)
-                    #     zippedFile.extractall(store_dir)
-                    #     os.remove(path)
-                    continue
+    # emailLines = open("scratchpad.txt", "r")
+    # fileName = ''
+    # attachmentId = ''
+    # for line in emailLines:
+    #     if re.match("(.*)attachmentId(.*)", line):
+    #         strippedLine = line.replace(' ', '').replace('\'attachmentId\':', '').replace('{', ''). \
+    #             replace(',', '').replace('\n', '').replace('\'', '').replace('ubody', '').replace(':uu', '')
+    #         attachmentId = strippedLine
+    #     if re.match("(.*)filename(.*)", line) and not re.match("(.*)value(.*)", line) and not re.match("(.*)''(.*)",line):
+    #         strippedLine = line.replace(' ', '').replace('\'filename\':', ''). \
+    #             replace(',', '').replace('\n', '').replace('\'', '').replace('uu', '')
+    #         fileName = strippedLine
+    #     if fileName and attachmentId:
+    #         att = service.users().messages().attachments().get(userId='me', messageId=messageId,id=attachmentId).execute()
+    #         data = att['data']
+    #         file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
+    #         path = os.path.join(attachment_directory, fileName)
+    #         if not os.path.isfile(path):
+    #             with open(path, 'w') as f:
+    #                 f.write(file_data)
+    #                 # if path.endswith(".zip"):
+    #                 #     zippedFile = ZipFile(path)
+    #                 #     zippedFile.extractall(store_dir)
+    #                 #     os.remove(path)
+    #                 continue
 
           #  test = findJsonValue(message_details, 'attachmentId')
           #  pp = pprint.PrettyPrinter(indent=4)
