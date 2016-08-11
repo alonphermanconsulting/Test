@@ -37,91 +37,80 @@ def main():
     config = ConfigParser.RawConfigParser()
     config.read('config.properties')
     attachment_directory = config.get('general', 'attachment_directory')
+    suffixes = config.get('general', 'emails_suffixes_to_ignore').split(",")
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('gmail', 'v1', http=http)
     messages = ListMessagesWithLabel(service, 'me', 'INBOX')
+    label = config.get('general', 'label')
     if not messages:
         print('No messages found.')
     else:
         for message in messages:
             message_details = service.users().messages().get(userId='me', id=message['id']).execute()
             messageString = json.dumps(message_details).replace('\\','')
-            print('message string', messageString)
-            fileNameMatch = re.match(r"(.*)filename=\"(.+?)\"(.*)", messageString)
+            #print('message string', messageString)
+            pp = pprint.PrettyPrinter(indent=4)
+            #pp.pprint(message_details)
+
             attachmentIdMatch = re.match(r"(.*)attachmentId\": \"(.+?)\"(.*)", messageString)
+            fromMatch = re.match(r"(.*)From\", \"value\": \"(.+?)\"(.*)", messageString)
+            subjectMatch = re.match(r"(.*)Subject\", \"value\": \"(.+?)\"(.*)", messageString)
+            returnPathMatch = re.match(r"(.*)Return-Path\", \"value\": \"(.+?)\"(.*)", messageString)
+
+            if label not in messageString:
+                print('not correct label - ignoring')
+                continue
+
+            if not returnPathMatch:
+                print('WARNING no return path - ignoring')
+                pp.pprint(message_details)
+                continue
+
+            if not subjectMatch:
+                print('WARNING no subject - ignoring')
+                pp.pprint(message_details)
+                continue
+
+            fromFound = fromMatch.group(2)
+            subjectFound = subjectMatch.group(2)
+            returnPathFound = returnPathMatch.group(2).replace('<', '').replace('>', '')
+            if '@' not in returnPathFound:
+                print('skipping message as no valid return path', messageSummary)
+                continue
+            messageSummary = "FROM " + fromFound + " RETURN PATH " + returnPathFound + " SUBJECT " +subjectFound
+            emailSuffixToCheck = re.match(r"(.*)@(.*)", returnPathFound).group(2)
+            if emailSuffixToCheck in suffixes:
+                print('skipping message as email suffix is to be ignored', messageSummary)
+                continue
+            fileNameMatch = re.match(r"(.*)filename=\"(.+?)\"(.*)", messageString)
             if not fileNameMatch:
-                print('skipping message ', messageString)
+                print('skipping message as no attachment present', messageSummary)
                 continue
             fileNameFound = fileNameMatch.group(2)
             attachmentIdFound = attachmentIdMatch.group(2)
-            try:
-                att = service.users().messages().attachments().get(userId='me', messageId=message['id'],id=attachmentIdFound).execute()
-            except errors.HttpError, error:
-                print('An error occurred: ', error)
-                fileNameFound = ''
-                attachmentIdFound = ''
-                continue
+            att = service.users().messages().attachments().get(userId='me', messageId=message['id'],id=attachmentIdFound).execute()
+
             data = att['data']
             file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
             path = os.path.join(attachment_directory, fileNameFound)
-            if not os.path.isfile(path) and not path.endswith(".jpg") and not path.endswith(".png") \
-                    and not path.endswith(".gif") and not path.endswith(".ics"):
+         # PUT BACK
+            if not os.path.isfile(path) and not path.lower().endswith(".jpg") and not path.lower().endswith(".png") \
+                    and not path.lower().endswith(".gif") and not path.lower().endswith(".ics"):
+         #   if path.endswith(".zip"):
                 with open(path, 'w') as f:
                     f.write(file_data)
-                    if path.endswith(".zip"):
-                        try:
-                            zippedFile = ZipFile(path)
-                            zippedFile.extractall(attachment_directory)
-                            os.remove(path)
-                        except zipfile.BadZipfile, error:
-                            print('unzip error occurred: ', error)
-            continue
-
-
-
-
-
-            pp = pprint.PrettyPrinter(indent=4)
-           # pp.pprint(message_details)
-            with open(EMAIL_MESSAGE_DUMP_FILE, 'wt') as out:
-                res = json.dump(message_details, out, sort_keys=True, indent=4, separators=(',', ': '))
-            emailLines = open(EMAIL_MESSAGE_DUMP_FILE, "r")
-            fileName = ''
-            attachmentId = ''
-            for line in emailLines:
-                if re.match("(.*)attachmentId(.*)", line):
-                    strippedLine = line.replace(' ', '').replace('\'', '').replace('"', '').\
-                        replace('attachmentId:', '').replace('{', ''). \
-                        replace(',', '').replace('\n', '').replace('\'', '').replace('ubody', '').replace(':uu', '')
-                    attachmentId = strippedLine
-                if re.match("(.*)filename(.*)", line) and not re.match("(.*)value(.*)", line) and not re.match("(.*)[\'\"][\'\"](.*)",line):
-                    strippedLine = line.replace(' ', '').replace('\'', '').replace('"', '').\
-                        replace('filename:', '').replace(',', '').replace('\n', '').replace('\'', '').replace('uu', '')
-                    fileName = strippedLine
-                if fileName and attachmentId:
+                if path.endswith(".zip"):
                     try:
-                        att = service.users().messages().attachments().get(userId='me', messageId=message['id'],id=attachmentId).execute()
-                    except errors.HttpError, error:
-                        print('An error occurred: ', error)
-                        fileName = ''
-                        attachmentId = ''
-                        continue
-                    data = att['data']
-                    file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
-                    path = os.path.join(attachment_directory, fileName)
-                    if not os.path.isfile(path) and not path.endswith(".jpg") and not path.endswith(".png") \
-                            and not path.endswith(".gif") and not path.endswith(".ics"):
-                        with open(path, 'w') as f:
-                            f.write(file_data)
-                            if path.endswith(".zip"):
-                                try:
-                                    zippedFile = ZipFile(path)
-                                    zippedFile.extractall(attachment_directory)
-                                    os.remove(path)
-                                except zipfile.BadZipfile, error:
-                                    print('unzip error occurred: ', error)
-                    continue
+                        fh = open(path, 'rb')
+                        z = zipfile.ZipFile(fh)
+                        #zippedFile = ZipFile(path)
+                        z.extractall(attachment_directory)
+                        os.remove(path)
+                        fh.close()
+                    except zipfile.BadZipfile, error:
+                        print('unzip error occurred: ', error)
+            continue
 
 
 def get_credentials():
