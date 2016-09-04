@@ -58,14 +58,14 @@ def main():
             subjectMatch = re.match(r"(.*)Subject\", \"value\": \"(.+?)\"(.*)", messageString)
             returnPathMatch = re.match(r"(.*)Return-Path\", \"value\": \"(.+?)\"(.*)", messageString)
 
-            if label not in messageString:
-                print('not correct label - ignoring')
-                continue
+            #if label not in messageString:
+            #    print('not correct label - ignoring')
+            #    continue
 
-            if not returnPathMatch:
-                print('WARNING no return path - ignoring')
-                pp.pprint(message_details)
-                continue
+          #  if not returnPathMatch:
+          #      print('WARNING no return path - ignoring')
+          #      pp.pprint(message_details)
+          #      continue
 
             if not subjectMatch:
                 print('WARNING no subject - ignoring')
@@ -74,18 +74,25 @@ def main():
 
             fromFound = fromMatch.group(2)
             subjectFound = subjectMatch.group(2)
-            returnPathFound = returnPathMatch.group(2).replace('<', '').replace('>', '')
-            if '@' not in returnPathFound:
-                print('skipping message as no valid return path', messageSummary)
-                continue
+
+            if returnPathMatch:
+                returnPathFound = returnPathMatch.group(2).replace('<', '').replace('>', '')
+                if '@' in returnPathFound:
+                    emailSuffixToCheck = re.match(r"(.*)@(.*)", returnPathFound).group(2)
+                    if emailSuffixToCheck in suffixes:
+                        print('skipping message as email suffix is to be ignored', emailSuffixToCheck)
+                        continue
+                else:
+                    returnPathFound="NONE"
+            else:
+                returnPathFound = "NONE"
+           #     print('skipping message as no valid return path', messageSummary)
+           #     continue
             messageSummary = "FROM " + fromFound + " RETURN PATH " + returnPathFound + " SUBJECT " +subjectFound
-            emailSuffixToCheck = re.match(r"(.*)@(.*)", returnPathFound).group(2)
-            if emailSuffixToCheck in suffixes:
-                print('skipping message as email suffix is to be ignored', messageSummary)
-                continue
             fileNameMatch = re.match(r"(.*)filename=\"(.+?)\"(.*)", messageString)
-            if not fileNameMatch:
+            if not fileNameMatch or not attachmentIdMatch:
                 print('skipping message as no attachment present', messageSummary)
+                pp.pprint(message_details)
                 continue
             fileNameFound = fileNameMatch.group(2)
             attachmentIdFound = attachmentIdMatch.group(2)
@@ -100,6 +107,7 @@ def main():
          #   if path.endswith(".zip"):
                 with open(path, 'w') as f:
                     f.write(file_data)
+                    print('saving file:', f)
                 if path.endswith(".zip"):
                     try:
                         fh = open(path, 'rb')
@@ -160,14 +168,17 @@ def ListMessagesWithLabel(service, user_id, label_name):
     """
 
     try:
-        response = service.users().messages().list(userId=user_id, labelIds=label_name).execute()
+        config = ConfigParser.RawConfigParser()
+        config.read('config.properties')
+        query = config.get('general', 'query')
+        response = service.users().messages().list(userId=user_id, q=query).execute()
         messages = []
         if 'messages' in response:
             messages.extend(response['messages'])
 
         while 'nextPageToken' in response:
             page_token = response['nextPageToken']
-            response = service.users().messages().list(userId=user_id, pageToken=page_token).execute()
+            response = service.users().messages().list(userId=user_id, pageToken=page_token, q=query).execute()
             messages.extend(response['messages'])
 
         return messages
