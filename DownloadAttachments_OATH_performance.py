@@ -47,6 +47,7 @@ def main():
         print('No messages found.')
     else:
         for message in messages:
+            current_files = os.listdir(attachment_directory)
             message_details = service.users().messages().get(userId='me', id=message['id']).execute()
             messageString = json.dumps(message_details).replace('\\','')
             #print('message string', messageString)
@@ -96,13 +97,18 @@ def main():
                 continue
             fileNameFound = fileNameMatch.group(2)
             attachmentIdFound = attachmentIdMatch.group(2)
+
+            if fileNameFound in current_files:
+                print('skipping ', fileNameFound, " as already stored")
+                continue
+
             att = service.users().messages().attachments().get(userId='me', messageId=message['id'],id=attachmentIdFound).execute()
 
             data = att['data']
             file_data = base64.urlsafe_b64decode(data.encode('UTF-8'))
             path = os.path.join(attachment_directory, fileNameFound)
          # PUT BACK
-            if not os.path.isfile(path) and not path.lower().endswith(".jpg") and not path.lower().endswith(".png") \
+            if not path.lower().endswith(".jpg") and not path.lower().endswith(".png") \
                     and not path.lower().endswith(".gif") and not path.lower().endswith(".ics"):
          #   if path.endswith(".zip"):
                 with open(path, 'w') as f:
