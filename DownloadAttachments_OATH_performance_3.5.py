@@ -67,32 +67,46 @@ def main():
           #      pp.pprint(message_details)
           #      continue
 
+           # pp.pprint(message_details)
             if not subjectMatch:
-                print('WARNING no subject - ignoring')
-                pp.pprint(message_details)
-                continue
+                #print('WARNING no subject - ignoring')
+                print('WARNING no subject')
+                #continue
+                subjectFound = ''
+            else:
+                subjectFound = subjectMatch.group(2)
 
-            fromFound = fromMatch.group(2)
-            subjectFound = subjectMatch.group(2)
+            if not fromMatch:
+                fromFound = ''
+            else:
+                fromFound = fromMatch.group(2)
 
+            emailSuffixToCheckFromReturnPath = ''
             if returnPathMatch:
                 returnPathFound = returnPathMatch.group(2).replace('<', '').replace('>', '')
                 if '@' in returnPathFound:
-                    emailSuffixToCheck = re.match(r"(.*)@(.*)", returnPathFound).group(2)
-                    if emailSuffixToCheck in suffixes:
-                        print('skipping message as email suffix is to be ignored', emailSuffixToCheck)
-                        continue
+                    emailSuffixToCheckFromReturnPath = re.match(r"(.*)@(.*)", returnPathFound).group(2)
                 else:
-                    returnPathFound="NONE"
+                    returnPathFound=''
             else:
-                returnPathFound = "NONE"
-           #     print('skipping message as no valid return path', messageSummary)
-           #     continue
-            messageSummary = "FROM " + fromFound + " RETURN PATH " + returnPathFound + " SUBJECT " +subjectFound
+                returnPathFound = ''
+
+            emailSuffixToCheckFromFrom = ''
+            if fromMatch:
+                fromFound = fromMatch.group(2).replace('<', '').replace('>', '')
+                if '@' in fromFound:
+                    emailSuffixToCheckFromFrom = re.match(r"(.*)@(.*)", fromFound).group(2)
+
+            messageSummary = "FROM: " + fromFound + " RETURNPATH: " + returnPathFound + " SUBJECT: " + subjectFound
+            print("message summary: ", messageSummary)
+            if emailSuffixToCheckFromReturnPath in suffixes or emailSuffixToCheckFromFrom in suffixes:
+                print('skipping message as email suffix is to be ignored', emailSuffixToCheckFromFrom, emailSuffixToCheckFromReturnPath)
+                continue
+
             fileNameMatch = re.match(r"(.*)filename=\"(.+?)\"(.*)", messageString)
             if not fileNameMatch or not attachmentIdMatch:
                 print('skipping message as no attachment present', messageSummary)
-                pp.pprint(message_details)
+                #pp.pprint(message_details)
                 continue
             fileNameFound = fileNameMatch.group(2)
             attachmentIdFound = attachmentIdMatch.group(2)
@@ -127,17 +141,9 @@ def main():
                     f.write(file_data)
                     print('saving file:', f)
                 if path.endswith(".zip"):
-                    try:
-                        fh = open(path, 'rb')
-                        z = zipfile.ZipFile(fh)
-                        #zippedFile = ZipFile(path)
-                        z.extractall(attachment_directory)
-                       # os.remove(path)
-                        fh.close()
-                    except Exception as error:
-                        print('unzip error occurred: ', error)
-
-
+                    with zipfile.ZipFile(path, "r") as zip_ref:
+                        zip_ref.extractall(attachment_directory)
+                os.remove(path)
 
 
 
